@@ -1,11 +1,89 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="tr">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Document</title>
+  <meta charset="UTF-8">
+  <title>QR Kod Şifreli Okuyucu</title>
+  <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
+  <style>
+    body {
+      font-family: sans-serif;
+      text-align: center;
+      padding: 20px;
+    }
+    #reader {
+      width: 300px;
+      margin: auto;
+    }
+    input[type="password"] {
+      padding: 10px;
+      font-size: 1rem;
+      margin: 10px;
+    }
+    #result {
+      margin-top: 20px;
+      font-size: 1.2rem;
+      color: green;
+    }
+  </style>
 </head>
 <body>
-    
+  <h2>QR Kod Şifreli Okuyucu</h2>
+
+  <input type="password" id="passwordInput" placeholder="Şifrenizi girin"><br>
+
+  <div id="reader"></div>
+
+  <div id="result">Sonuç burada görünecek</div>
+
+  <script>
+    function hashAndPad(input, length) {
+      const hash = CryptoJS.SHA256(input);
+      const hex = hash.toString(CryptoJS.enc.Hex);
+      const wordArray = CryptoJS.enc.Hex.parse(hex);
+      if (wordArray.sigBytes >= length) {
+        return CryptoJS.lib.WordArray.create(wordArray.words.slice(0, length / 4), length);
+      } else {
+        // padding eklenebilir ama 256-bit SHA zaten yeterli
+        return wordArray;
+      }
+    }
+
+    function decodePack(encryptedPack, pass) {
+      const key = hashAndPad(pass, 32);
+      const iv = hashAndPad(pass + "iv", 16);
+
+      try {
+        const decrypted = CryptoJS.AES.decrypt(encryptedPack, key, {
+          iv: iv,
+          mode: CryptoJS.mode.CBC,
+          padding: CryptoJS.pad.Pkcs7
+        });
+        return decrypted.toString(CryptoJS.enc.Utf8);
+      } catch (err) {
+        return "Şifre çözme başarısız.";
+      }
+    }
+
+    function onScanSuccess(decodedText) {
+      const password = document.getElementById('passwordInput').value;
+
+      if (!password) {
+        alert("Lütfen önce şifrenizi girin!");
+        return;
+      }
+
+      const result = decodePack(decodedText, password);
+
+      document.getElementById('result').innerText = "Çözülmüş veri: " + result;
+    }
+
+    function onScanFailure(error) {
+      // sessiz geç
+    }
+
+    const html5QrcodeScanner = new Html5QrcodeScanner("reader", { fps: 10, qrbox: 250 }, false);
+    html5QrcodeScanner.render(onScanSuccess, onScanFailure);
+  </script>
 </body>
 </html>
